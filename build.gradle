@@ -1,0 +1,20 @@
+plugins {
+    id 'scala'
+    id 'application'
+}
+
+sourceCompatibility = 1.7
+
+mainClassName = 'com.athens.Athens'
+
+repositories {
+    mavenCentral()
+}
+
+
+dependencies {
+    testCompile group: 'junit', name: 'junit', version: '4.11'
+    compile 'org.scalatest:scalatest_2.10:3.0.0-M7'
+    compile 'org.json4s:json4s-native_2.10:3.3.0'
+    compile 'org.json4s:json4s-jackson_2.10:3.3.0'
+}
