@@ -73,7 +73,7 @@ object Athens extends App {
 
   def store(seq: Map[Permutation, (Int, String, String)]) = {
     println("Writing hashtag pairs to file ...")
-    val f = new File(current)
+    val f = new File(current + ".txt")
     if (!append) {
       if (f.exists) {
         f.delete
