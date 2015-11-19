@@ -3,11 +3,15 @@ package com.athens
 import java.io.{File, FileOutputStream, PrintWriter}
 import java.nio.file.Files
 
+import org.json4s._
+import org.json4s.native.JsonMethods._
+import org.json4s.native.Serialization
+
 import scala.collection.JavaConverters._
 import scala.collection.mutable.ListBuffer
-import scala.util.parsing.json.JSON
 
 object Athens extends App {
+  implicit val formats = Serialization.formats(NoTypeHints)
 
   var append = false
   var current = ""
@@ -29,33 +33,37 @@ object Athens extends App {
 
 
   override def main(args: Array[String]) = {
-        computeDataset("NewYorkOneWeek")
-    //    computeDataset("ParisSearchJan")
-//    computeDataset("ParisSearchFeb")
-    //    computeDataset("Oscars")
+    computeDataset("NewYorkOneWeek")
+    computeDataset("ParisSearchJan")
+    computeDataset("ParisSearchFeb")
+    computeDataset("Oscars")
   }
 
   def computeDataset(dataset: String) = {
+    val start = System.currentTimeMillis
     current = dataset
     append = false
     val files: Seq[File] = new File(root + dataset).listFiles()
     println("Starting ...")
     files.foreach(println)
-    files.foreach(compute)
+    val tweets = files.flatMap(compute)
+    println(s"Loading completed in ${((System.currentTimeMillis - start) / 1000)} seconds!")
+
+    val uniqueTweets = tweets.map(t => (t.hashtags, t)).toMap.values
+//    uniqueTweets.foreach(println)
+    println("Total number of tweets: " + tweets.size + " - Unique tweets: " + uniqueTweets.size)
+    val permutations = uniqueTweets.flatMap(_.permutations).groupBy(t => t).mapValues(t => (t.size, t.map(_.id).toSet.mkString(","), t.map(_.uid).toSet.mkString(",")))
+    store(permutations)
   }
 
-  def compute(first: File): Unit = {
+  def compute(first: File): Seq[Tweet] = {
     println("Reading freom file: " + first.getName)
     val raw = load(first)
     println("Read " + raw.size + " lines ... Parsing json ...")
     val start = System.currentTimeMillis
     val allTweets = raw.map(fromJson).filter(_.nonEmpty).map(_.get)
     println("Loaded json in " + (System.currentTimeMillis - start) + " ms")
-    val uniqueTweets = allTweets.map(t => (t.hashtags, t)).toMap.values
-    uniqueTweets.foreach(println)
-    println("Total number of tweets: " + allTweets.size + " - Unique tweets: " + uniqueTweets.size)
-    val permutations = uniqueTweets.flatMap(_.permutations).groupBy(t => t).mapValues(t => (t.size, t.map(_.id).toSet.mkString(","), t.map(_.uid).toSet.mkString(",")))
-    store(permutations)
+    allTweets
   }
 
   def load(file: File): Seq[String] = {
@@ -65,7 +73,7 @@ object Athens extends App {
 
   def store(seq: Map[Permutation, (Int, String, String)]) = {
     println("Writing hashtag pairs to file ...")
-    val f = new File(current + ".txt")
+    val f = new File(current)
     if (!append) {
       if (f.exists) {
         f.delete
@@ -80,27 +88,26 @@ object Athens extends App {
   }
 
   def fromJson(json: String): Option[Tweet] = {
-    val n: List[(String, List[Any], String)] = for {
-      Some(M(map)) <- List(JSON.parseFull(json))
-      // ID of tweet
-      S(id) = map("id_str")
-      // User of tweet
-      M(userinfo) = map("user")
-      S(name) = userinfo.get("id_str").get
-      // get the hashtags
-      M(entities) = map("entities")
-      L(tags) = entities("hashtags")
-      if (tags.size >= 2)
+    val full = parse(json)
+    val n: (String, String) = (for {
+      JObject(child) <- full
+      JField("id_str", JString(id)) <- child
+      JField("user", JObject(userinfo)) <- child
+      JField("id_str", JString(uid)) <- userinfo
+    } yield (id, uid)) (0)
+
+    val m: List[String] = for {
+      JObject(child) <- full
+      JField("entities", JObject(entities)) <- child
+      JField("hashtags", JArray(hashtags)) <- entities
+      JObject(tag) <- hashtags
+      JField("text", JString(text)) <- tag
     } yield {
-      (id, tags, name)
+      text
     }
-    val hashtags = n.map(t => (t._1, t._2 match {
-      case (a: List[Map[String, String]]) => a.map(x => x("text").toLowerCase)
-      case _ => Nil
-    }, t._3))
-    // RETURN THE ACTUAL TWEET, IN THE TAGS
-    if (hashtags.nonEmpty) Some(Tweet(id = hashtags(0)._1, hashtags = hashtags(0)._2.toSet, uid = hashtags(0)._3))
-    else None
+
+    if (m.size < 2) None
+    else Some(Tweet(id = n._1, hashtags = m.toSet, uid = n._2))
   }
 }
 
