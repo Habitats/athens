@@ -17,21 +17,6 @@ object Athens extends App {
   var current = ""
   lazy val root = "C:\\Archive\\athensDataTwitter\\"
 
-  class CC[T] {
-    def unapply(a: Any): Option[T] = Some(a.asInstanceOf[T])
-  }
-
-  object M extends CC[Map[String, Any]]
-
-  object L extends CC[List[Any]]
-
-  object S extends CC[String]
-
-  object D extends CC[Double]
-
-  object B extends CC[Boolean]
-
-
   override def main(args: Array[String]) = {
     computeDataset("NewYorkOneWeek")
     computeDataset("ParisSearchJan")
@@ -50,7 +35,6 @@ object Athens extends App {
     println(s"Loading completed in ${((System.currentTimeMillis - start) / 1000)} seconds!")
 
     val uniqueTweets = tweets.map(t => (t.hashtags, t)).toMap.values
-//    uniqueTweets.foreach(println)
     println("Total number of tweets: " + tweets.size + " - Unique tweets: " + uniqueTweets.size)
     val permutations = uniqueTweets.flatMap(_.permutations).groupBy(t => t).mapValues(t => (t.size, t.map(_.id).toSet.mkString(","), t.map(_.uid).toSet.mkString(",")))
     store(permutations)
@@ -103,7 +87,7 @@ object Athens extends App {
       JObject(tag) <- hashtags
       JField("text", JString(text)) <- tag
     } yield {
-      text
+      text.toLowerCase
     }
 
     if (m.size < 2) None
