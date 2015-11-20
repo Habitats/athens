@@ -1,4 +1,4 @@
-# athens
+# Athens
 Detecting events in Twitter
 
 ## Filtering
